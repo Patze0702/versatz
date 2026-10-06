@@ -67,20 +67,20 @@ export const versatzKurven = defineFeature(function(context is Context, id is Id
 
             if (curve is Line)
             {
-                segs = append(segs, { "type" : "line", "p0" : p0, "p1" : p1, "t0" : t0, "t1" : t1 });
+                segs = append(segs, { "kind" : "line", "p0" : p0, "p1" : p1, "t0" : t0, "t1" : t1 });
             }
             else if (curve is Circle)
             {
                 const c = to2D(curve.coordSystem.origin, plane, yAxis);
                 const r = curve.radius / meter;
-                if (norm(p0 - p1) < tol)
+                if (norm2(p0 - p1) < tol)
                 {
                     circles = append(circles, { "c" : c, "r" : r });
                 }
                 else
                 {
                     const ccw = cross2(p0 - c, t0) > 0;
-                    segs = append(segs, { "type" : "arc", "p0" : p0, "p1" : p1, "t0" : t0, "t1" : t1,
+                    segs = append(segs, { "kind" : "arc", "p0" : p0, "p1" : p1, "t0" : t0, "t1" : t1,
                                 "c" : c, "r" : r, "ccw" : ccw });
                 }
             }
@@ -110,13 +110,13 @@ export const versatzKurven = defineFeature(function(context is Context, id is Id
                     const tail = chain[size(chain) - 1].p1;
                     const head = chain[0].p0;
                     var cand = segs[j];
-                    if (norm(cand.p0 - tail) < tol)
+                    if (norm2(cand.p0 - tail) < tol)
                         chain = append(chain, cand);
-                    else if (norm(cand.p1 - tail) < tol)
+                    else if (norm2(cand.p1 - tail) < tol)
                         chain = append(chain, reverseSeg(cand));
-                    else if (norm(cand.p1 - head) < tol)
+                    else if (norm2(cand.p1 - head) < tol)
                         chain = concatenateArrays([[cand], chain]);
-                    else if (norm(cand.p0 - head) < tol)
+                    else if (norm2(cand.p0 - head) < tol)
                         chain = concatenateArrays([[reverseSeg(cand)], chain]);
                     else
                         continue;
@@ -140,7 +140,7 @@ export const versatzKurven = defineFeature(function(context is Context, id is Id
         for (var chain0 in chains)
         {
             var chain = chain0;
-            const closed = norm(chain[0].p0 - chain[size(chain) - 1].p1) < tol;
+            const closed = norm2(chain[0].p0 - chain[size(chain) - 1].p1) < tol;
             if (closed && signedArea(chain) < 0)
                 chain = reverseChain(chain);
 
@@ -155,9 +155,9 @@ export const versatzKurven = defineFeature(function(context is Context, id is Id
                 {
                     counter += 1;
                     const sid = "e" ~ counter;
-                    if (item.type == "line")
+                    if (item.kind == "line")
                         skLineSegment(sketch, sid, { "start" : item.a * meter, "end" : item.b * meter });
-                    else if (item.type == "arc")
+                    else if (item.kind == "arc")
                         skArc(sketch, sid, { "start" : item.a * meter, "mid" : item.m * meter, "end" : item.b * meter });
                 }
             }
@@ -202,14 +202,14 @@ function cross2(a is Vector, b is Vector) returns number
     return a[0] * b[1] - a[1] * b[0];
 }
 
-function norm(v is Vector) returns number
+function norm2(v is Vector) returns number
 {
     return sqrt(v[0] * v[0] + v[1] * v[1]);
 }
 
 function unit2(v is Vector) returns Vector
 {
-    const n = norm(v);
+    const n = norm2(v);
     return vector(v[0] / n, v[1] / n);
 }
 
@@ -220,7 +220,7 @@ function reverseSeg(s is map) returns map
     r.p1 = s.p0;
     r.t0 = -s.t1;
     r.t1 = -s.t0;
-    if (s.type == "arc")
+    if (s.kind == "arc")
         r.ccw = !s.ccw;
     return r;
 }
@@ -240,7 +240,7 @@ function signedArea(chain is array) returns number
     for (var s in chain)
     {
         pts = append(pts, s.p0);
-        if (s.type == "arc")
+        if (s.kind == "arc")
         {
             const a0 = atan2(s.p0[1] - s.c[1], s.p0[0] - s.c[0]) / radian;
             const sw = arcSweep(s);
@@ -280,18 +280,18 @@ function modPositive(x is number, m is number) returns number
 // Versetzte, unbegrenzte Kurve eines Segments (s > 0: links der Laufrichtung)
 function offsetCurveOf(seg is map, s is number) returns map
 {
-    if (seg.type == "line")
+    if (seg.kind == "line")
     {
         const n = vector(-seg.t0[1], seg.t0[0]);
-        return { "type" : "line", "a" : seg.p0 + n * s, "u" : seg.t0, "p0" : seg.p0 + n * s, "p1" : seg.p1 + n * s };
+        return { "kind" : "line", "a" : seg.p0 + n * s, "u" : seg.t0, "p0" : seg.p0 + n * s, "p1" : seg.p1 + n * s };
     }
     const r = seg.ccw ? seg.r - s : seg.r + s;
-    return { "type" : "arc", "c" : seg.c, "r" : r, "ccw" : seg.ccw };
+    return { "kind" : "arc", "c" : seg.c, "r" : r, "ccw" : seg.ccw };
 }
 
 function intersectCurves(a is map, b is map) returns array
 {
-    if (a.type == "line" && b.type == "line")
+    if (a.kind == "line" && b.kind == "line")
     {
         const det = cross2(a.u, b.u);
         if (abs(det) < 1e-9)
@@ -299,9 +299,9 @@ function intersectCurves(a is map, b is map) returns array
         const t = cross2(b.a - a.a, b.u) / det;
         return [a.a + a.u * t];
     }
-    if (a.type == "arc" && b.type == "line")
+    if (a.kind == "arc" && b.kind == "line")
         return intersectCurves(b, a);
-    if (a.type == "line" && b.type == "arc")
+    if (a.kind == "line" && b.kind == "arc")
     {
         const w = a.a - b.c;
         const B = a.u[0] * w[0] + a.u[1] * w[1];
@@ -314,7 +314,7 @@ function intersectCurves(a is map, b is map) returns array
     }
     // Kreis-Kreis
     const dv = b.c - a.c;
-    const dd = norm(dv);
+    const dd = norm2(dv);
     if (dd < 1e-12 || dd > a.r + b.r || dd < abs(a.r - b.r))
         return [];
     const x = (dd * dd + a.r * a.r - b.r * b.r) / (2 * dd);
@@ -330,7 +330,7 @@ function nearest(cands is array, ref is Vector) returns Vector
 {
     var best = cands[0];
     for (var c in cands)
-        if (norm(c - ref) < norm(best - ref))
+        if (norm2(c - ref) < norm2(best - ref))
             best = c;
     return best;
 }
@@ -380,7 +380,7 @@ function offsetChain(chain is array, s is number, closed is boolean, tol is numb
         const cands = intersectCurves(curves[i], curves[j]);
         if (size(cands) == 0)
         {
-            bridges = append(bridges, { "type" : "line", "a" : ends[i], "b" : starts[j] });
+            bridges = append(bridges, { "kind" : "line", "a" : ends[i], "b" : starts[j] });
             warn = "An einer Ecke gab es keinen Schnittpunkt; Ecke wurde mit einer Linie verbunden.";
         }
         else
@@ -397,9 +397,9 @@ function offsetChain(chain is array, s is number, closed is boolean, tol is numb
         const seg = chain[i];
         const a = starts[i];
         const b = ends[i];
-        if (norm(a - b) < tol)
+        if (norm2(a - b) < tol)
             continue;
-        if (seg.type == "line")
+        if (seg.kind == "line")
         {
             // Segment darf nicht umklappen (zu starker Versatz)
             if ((b - a)[0] * seg.t0[0] + (b - a)[1] * seg.t0[1] <= 0)
@@ -407,7 +407,7 @@ function offsetChain(chain is array, s is number, closed is boolean, tol is numb
                 warn = "Ein Segment verschwindet beim Versatz (Abstand zu gross).";
                 continue;
             }
-            items = append(items, { "type" : "line", "a" : a, "b" : b });
+            items = append(items, { "kind" : "line", "a" : a, "b" : b });
         }
         else
         {
@@ -422,7 +422,7 @@ function offsetChain(chain is array, s is number, closed is boolean, tol is numb
             const sw = seg.ccw ? modPositive(a1 - a0, 2 * PI) : -modPositive(a0 - a1, 2 * PI);
             const am = a0 + sw / 2;
             const m = vector(seg.c[0] + r * cos(am * radian), seg.c[1] + r * sin(am * radian));
-            items = append(items, { "type" : "arc", "a" : a, "m" : m, "b" : b });
+            items = append(items, { "kind" : "arc", "a" : a, "m" : m, "b" : b });
         }
     }
     return { "items" : items, "warn" : warn };
