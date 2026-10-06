@@ -39,8 +39,11 @@ export const versatzKurven = defineFeature(function(context is Context, id is Id
         annotation { "Name" : "Richtung umkehren (offene Ketten)", "UIHint" : UIHint.OPPOSITE_DIRECTION }
         definition.flip is boolean;
 
+        annotation { "Name" : "Nur Aussenkontur (groesste Kette)" }
+        definition.onlyOuter is boolean;
+
         annotation { "Name" : "Verbindungstoleranz" }
-        isLength(definition.tol, { (millimeter) : [1e-4, 0.01, 1] } as LengthBoundSpec);
+        isLength(definition.tol, { (millimeter) : [1e-4, 0.05, 5] } as LengthBoundSpec);
     }
     {
         const edgeList = evaluateQuery(context, definition.edges);
@@ -86,7 +89,21 @@ export const versatzKurven = defineFeature(function(context is Context, id is Id
             }
             else
             {
-                reportFeatureWarning(context, id, "Kurve ohne Linie/Bogen/Kreis wurde übersprungen (z. B. Spline).");
+                // Spline o. ae.: als Polylinie abtasten
+                const N = 24;
+                var prev = l0;
+                for (var k = 1; k <= N; k += 1)
+                {
+                    const nxt = (k == N) ? l1 : evEdgeTangentLine(context, { "edge" : e, "parameter" : k / N });
+                    const a = to2D(prev.origin, plane, yAxis);
+                    const b = to2D(nxt.origin, plane, yAxis);
+                    if (norm2(b - a) > 1e-9)
+                    {
+                        const t = (b - a) / norm2(b - a);
+                        segs = append(segs, { "kind" : "line", "p0" : a, "p1" : b, "t0" : t, "t1" : t });
+                    }
+                    prev = nxt;
+                }
             }
         }
 
@@ -125,6 +142,23 @@ export const versatzKurven = defineFeature(function(context is Context, id is Id
                 }
             }
             chains = append(chains, chain);
+        }
+
+        if (definition.onlyOuter && size(chains) > 0)
+        {
+            var bestIdx = 0;
+            var bestSize = -1;
+            for (var ci0 = 0; ci0 < size(chains); ci0 += 1)
+            {
+                const sz = chainSize(chains[ci0]);
+                if (sz > bestSize)
+                {
+                    bestSize = sz;
+                    bestIdx = ci0;
+                }
+            }
+            chains = [chains[bestIdx]];
+            circles = [];
         }
 
         // ---- Versatz ----
@@ -195,6 +229,26 @@ function dir2D(v is Vector, plane is Plane, yAxis is Vector) returns Vector
 {
     const w = normalize(v);
     return vector(dot(w, plane.x), dot(w, yAxis));
+}
+
+// Diagonale der Bounding Box einer Kette
+function chainSize(chain is array) returns number
+{
+    var minX = chain[0].p0[0];
+    var maxX = minX;
+    var minY = chain[0].p0[1];
+    var maxY = minY;
+    for (var sg in chain)
+    {
+        for (var pt in [sg.p0, sg.p1])
+        {
+            minX = min(minX, pt[0]);
+            maxX = max(maxX, pt[0]);
+            minY = min(minY, pt[1]);
+            maxY = max(maxY, pt[1]);
+        }
+    }
+    return sqrt((maxX - minX) * (maxX - minX) + (maxY - minY) * (maxY - minY));
 }
 
 function cross2(a is Vector, b is Vector) returns number
