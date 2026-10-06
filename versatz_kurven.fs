@@ -1,5 +1,5 @@
-FeatureScript 2260;
-import(path : "onshape/std/common.fs", version : "2260.0");
+FeatureScript 3044;
+import(path : "onshape/std/common.fs", version : "3044.0");
 
 /**
  * Versatz Kurven
