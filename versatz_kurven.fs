@@ -23,7 +23,7 @@ export enum VersatzSeite
     BEIDE
 }
 
-annotation { "Feature Type Name" : "Versatz Kurven", "Feature Type Description" : "Versetzt alle gewählten Skizzenkurven nach innen/außen" }
+annotation { "Feature Type Name" : "Versatz Kurven", "Feature Type Description" : "Versetzt alle gewaehlten Skizzenkurven nach innen/aussen" }
 export const versatzKurven = defineFeature(function(context is Context, id is Id, definition is map)
     precondition
     {
@@ -205,12 +205,6 @@ function cross2(a is Vector, b is Vector) returns number
 function norm2(v is Vector) returns number
 {
     return sqrt(v[0] * v[0] + v[1] * v[1]);
-}
-
-function unit2(v is Vector) returns Vector
-{
-    const n = norm2(v);
-    return vector(v[0] / n, v[1] / n);
 }
 
 function reverseSeg(s is map) returns map
